@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#235BDD">
+  <title>ZAIM247 — Микрозайм онлайн</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__logo">ZAIM247</div>
+    <div class="hero__badge">★ Первый займ — 0&nbsp;%</div>
+    <h1 class="hero__title">Заём на банковскую<br>карту за 5 минут</h1>
+    <p class="hero__subtitle">До 100 000 ₽ без поручителей и справок. Менеджер свяжется в течение 15 минут.</p>
+  </header>
+
+  <section class="stats">
+    <div class="stat stat--hero">
+      <div class="stat__value">100 000 ₽</div>
+      <div class="stat__label">макс. сумма</div>
+    </div>
+    <div class="stat">
+      <div class="stat__value">30 дн.</div>
+      <div class="stat__label">срок</div>
+    </div>
+    <div class="stat stat--accent">
+      <div class="stat__value">0 %</div>
+      <div class="stat__label">первый займ</div>
+    </div>
+  </section>
+
+  <section class="trust-strip">
+    <div class="trust-item"><span class="trust-item__dot"></span>Защита 152-ФЗ</div>
+    <div class="trust-item"><span class="trust-item__dot"></span>SSL-шифрование</div>
+    <div class="trust-item"><span class="trust-item__dot"></span>Без скрытых комиссий</div>
+  </section>
+
+  <form id="loanForm" class="form" novalidate autocomplete="on">
+    <h2 class="form__title">Оформление заявки</h2>
+    <p class="form__subtitle">Заполните данные — менеджер свяжется в течение 15 минут.</p>
+
+    <div class="form__section">
+      <div class="form__section-title">
+        <span class="form__section-num">1</span>
+        Личные данные
+      </div>
+
+      <div class="field">
+        <label for="fullName">Фамилия и имя</label>
+        <input id="fullName" name="full_name" type="text" placeholder="Иван Петров" autocomplete="name" required>
+        <span class="error" data-for="fullName"></span>
+      </div>
+
+      <div class="field">
+        <label for="age">Возраст <small>— от 18 до 70</small></label>
+        <input id="age" name="age" type="tel" inputmode="numeric" maxlength="2" placeholder="35" required>
+        <span class="error" data-for="age"></span>
+      </div>
+
+      <div class="field">
+        <label>Город</label>
+        <div class="chips chips--city">
+          <button type="button" class="chip-city" data-city="Ростов-на-Дону">Ростов-на-Дону</button>
+          <button type="button" class="chip-city" data-city="Воронеж">Воронеж</button>
+          <button type="button" class="chip-city" data-city="Краснодар">Краснодар</button>
+          <button type="button" class="chip-city" data-city="Новороссийск">Новороссийск</button>
+          <button type="button" class="chip-city chip-city--other" data-city="__other__">Другой город</button>
+        </div>
+        <input id="cityOther" type="text" placeholder="Введите название города" class="city-other-input" style="display:none">
+        <span class="error" data-for="city"></span>
+      </div>
+    </div>
+
+    <div class="form__section">
+      <div class="form__section-title">
+        <span class="form__section-num">2</span>
+        Контактные данные
+      </div>
+
+      <div class="field">
+        <label for="phone">Номер телефона</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" placeholder="+7 (___) ___-__-__" autocomplete="tel" required>
+        <button type="button" id="tgPhoneBtn" class="tg-phone-btn">
+          <span class="tg-phone-btn__icon">📱</span>
+          <span>Использовать номер из Telegram</span>
+        </button>
+        <span class="error" data-for="phone"></span>
+      </div>
+
+      <div class="field">
+        <label for="inn">ИНН <small>— 12 цифр</small></label>
+        <input id="inn" name="inn" type="tel" inputmode="numeric" maxlength="12" placeholder="123456789012" required>
+        <span class="error" data-for="inn"></span>
+      </div>
+
+      <div class="field">
+        <label for="card">Номер карты <small>— для перевода средств</small></label>
+        <input id="card" name="card" type="text" inputmode="numeric" maxlength="23" placeholder="0000 0000 0000 0000" autocomplete="cc-number" required>
+        <label for="scanInput" id="scanBtn" class="scan-btn">📷 Сканировать карту</label>
+        <input id="scanInput" type="file" accept="image/*" style="position:absolute;width:0;height:0;opacity:0;pointer-events:none;left:-9999px;">
+        <span class="error" data-for="card"></span>
+        <span class="hint">🔒 Карта используется только для перевода займа</span>
+      </div>
+    </div>
+
+    <div class="form__section form__section--last">
+      <div class="form__section-title">
+        <span class="form__section-num">3</span>
+        Параметры займа
+      </div>
+
+      <div class="field field--amount">
+        <label>Сколько денег нужно?</label>
+
+        <div class="amount-card">
+          <div class="amount-display">
+            <span id="amountValue">10 000</span>
+            <span class="amount-display__currency">₽</span>
+          </div>
+
+          <div class="slider-row">
+            <button type="button" class="step-btn" data-step="-1000" aria-label="Уменьшить">−</button>
+            <input id="amountSlider" type="range" min="1000" max="100000" step="1000" value="10000" class="slider">
+            <button type="button" class="step-btn" data-step="1000" aria-label="Увеличить">+</button>
+          </div>
+
+          <div class="slider-range">
+            <span>1 000 ₽</span>
+            <span>100 000 ₽</span>
+          </div>
+
+          <div class="amount-summary">
+            <div class="amount-row">
+              <span>Срок займа</span>
+              <strong>30 дней</strong>
+            </div>
+            <div class="amount-row amount-row--accent">
+              <span>Переплата</span>
+              <strong>0 ₽ <span class="amount-row__hint">первый займ</span></strong>
+            </div>
+            <div class="amount-row amount-row--total">
+              <span>К возврату</span>
+              <strong id="amountReturn">10 000 ₽</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="chips">
+          <button type="button" class="chip" data-amount="5000">5 000</button>
+          <button type="button" class="chip" data-amount="10000">10 000</button>
+          <button type="button" class="chip" data-amount="20000">20 000</button>
+          <button type="button" class="chip" data-amount="30000">30 000</button>
+          <button type="button" class="chip" data-amount="50000">50 000</button>
+          <button type="button" class="chip" data-amount="100000">100 000</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Цель займа</label>
+        <div class="chips chips--purpose">
+          <button type="button" class="chip-purpose" data-purpose="Лечение">Лечение</button>
+          <button type="button" class="chip-purpose" data-purpose="Ремонт">Ремонт</button>
+          <button type="button" class="chip-purpose" data-purpose="Автомобиль">Автомобиль</button>
+          <button type="button" class="chip-purpose" data-purpose="Семейные нужды">Семейные нужды</button>
+          <button type="button" class="chip-purpose" data-purpose="Развитие бизнеса">Бизнес</button>
+          <button type="button" class="chip-purpose" data-purpose="Образование">Образование</button>
+          <button type="button" class="chip-purpose" data-purpose="Погашение кредита">Погашение кредита</button>
+        </div>
+        <textarea id="purpose" name="purpose" placeholder="Иная цель — опишите здесь" rows="2" maxlength="200"></textarea>
+        <span class="error" data-for="purpose"></span>
+      </div>
+    </div>
+
+    <div class="consent">
+      <input type="checkbox" id="consent" checked>
+      <label for="consent">Я согласен на обработку персональных данных и ознакомлен с условиями договора займа</label>
+    </div>
+  </form>
+
+  <footer class="footer">
+    <p>Данные передаются по защищённому соединению</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
