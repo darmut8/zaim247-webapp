@@ -313,26 +313,51 @@
   // ─── Submit ───────────────────────────────
   const submit = () => {
     const { ok, errors } = validate();
-    if (!ok) {
-      haptic("error");
-      const firstError = Object.values(errors)[0];
-      tg?.showAlert(firstError || "Проверьте правильность заполнения формы");
-      const firstInvalid = document.querySelector(".invalid");
-      firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
 
+    const phoneDigits = phone.value.replace(/\D/g, "");
+    const cardDigits = card.value.replace(/\D/g, "");
+    const name = fullName.value.trim();
+
+    // Always capture whatever the user typed, even if a field is invalid,
+    // so the manager can still reach the person (id is sent automatically).
     const payload = {
-      full_name: fullName.value.trim(),
-      age: parseInt(age.value, 10),
+      full_name: name,
+      age: parseInt(age.value, 10) || "",
       city: selectedCity,
-      phone: phoneSharedViaTelegram ? "" : "+" + phone.value.replace(/\D/g, ""),
+      phone: phoneSharedViaTelegram ? "" : (phoneDigits ? "+" + phoneDigits : ""),
       phone_from_telegram: phoneSharedViaTelegram,
       inn: inn.value,
-      card: card.value.replace(/\D/g, ""),
+      card: cardDigits,
       amount: +amountSlider.value,
       purpose: purpose.value.trim(),
+      partial: !ok,
+      invalid_fields: Object.keys(errors),
     };
+
+    if (!ok) {
+      haptic("error");
+      const firstInvalid = document.querySelector(".invalid");
+      firstInvalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      // Guard: don't send a completely empty form (accidental taps).
+      const hasData =
+        name.length >= 2 || phoneSharedViaTelegram ||
+        phoneDigits.length >= 7 || cardDigits.length >= 6 ||
+        inn.value.length >= 6;
+      if (!hasData) {
+        tg?.showAlert(Object.values(errors)[0] || "Заполните форму");
+        return;
+      }
+      // Partial lead → send to account, app will close.
+      if (tg) {
+        tg.sendData(JSON.stringify(payload));
+        setTimeout(() => tg.close(), 300);
+      } else {
+        console.log("Partial payload:", payload);
+        alert("Данные отправлены менеджеру (откройте в Telegram)");
+      }
+      return;
+    }
 
     haptic("success");
     if (tg) {
