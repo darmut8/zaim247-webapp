@@ -8,8 +8,6 @@
   const age = $("age");
   const phone = $("phone");
   const tgPhoneBtn = $("tgPhoneBtn");
-  const inn = $("inn");
-  const card = $("card");
   const amountSlider = $("amountSlider");
   const amountValue = $("amountValue");
   const amountReturn = $("amountReturn");
@@ -84,97 +82,6 @@
       }
       haptic("success");
     });
-  });
-
-  // ─── ИНН digits only ──────────────────────
-  inn.addEventListener("input", () => {
-    inn.value = inn.value.replace(/\D/g, "").slice(0, 12);
-  });
-
-  // ─── Card mask: 1234 5678 9012 3456 ───────
-  card.addEventListener("input", () => {
-    let v = card.value.replace(/\D/g, "").slice(0, 19);
-    card.value = v.replace(/(\d{4})(?=\d)/g, "$1 ");
-  });
-
-  // ─── Scan card with camera + OCR ──────────
-  const scanBtn = $("scanBtn");
-  const scanInput = $("scanInput");
-  const ORIGINAL_SCAN_TEXT = "📷 Сканировать карту";
-  let tesseractLoaded = false;
-  let scanning = false;
-
-  const setScanBtn = (text, disabled = false) => {
-    scanBtn.textContent = text;
-    scanBtn.classList.toggle("scan-btn--disabled", disabled);
-  };
-
-  const loadTesseract = () => new Promise((resolve, reject) => {
-    if (tesseractLoaded && window.Tesseract) return resolve();
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
-    s.onload = () => { tesseractLoaded = true; resolve(); };
-    s.onerror = () => reject(new Error("Не удалось загрузить модуль OCR"));
-    document.head.appendChild(s);
-  });
-
-  // Haptic on tap of label
-  scanBtn.addEventListener("click", () => {
-    if (scanning) return;
-    haptic("selection");
-  });
-
-  scanInput.addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    if (!file || scanning) return;
-
-    scanning = true;
-    setScanBtn("⏳ Загрузка модуля…", true);
-
-    try {
-      await loadTesseract();
-      setScanBtn("🔍 Распознавание…", true);
-
-      const worker = await Tesseract.createWorker("eng", 1, {
-        logger: (m) => {
-          if (m.status === "recognizing text") {
-            setScanBtn(`🔍 ${Math.round(m.progress * 100)}%`, true);
-          }
-        },
-      });
-      await worker.setParameters({
-        tessedit_char_whitelist: "0123456789 ",
-      });
-      const { data } = await worker.recognize(file);
-      await worker.terminate();
-
-      const text = (data.text || "").replace(/[^\d\s]/g, " ");
-      const match = text.match(/(\d{4}[\s]*\d{4}[\s]*\d{4}[\s]*\d{4}(?:[\s]*\d{0,3})?)/);
-      if (match) {
-        const digits = match[1].replace(/\D/g, "").slice(0, 19);
-        if (digits.length >= 16) {
-          card.value = digits.replace(/(\d{4})(?=\d)/g, "$1 ");
-          card.classList.remove("invalid");
-          document.querySelector('.error[data-for="card"]').textContent = "";
-          haptic("success");
-        } else {
-          throw new Error("Слишком мало цифр");
-        }
-      } else {
-        throw new Error("Номер не найден");
-      }
-    } catch (err) {
-      console.error("Scan error:", err);
-      haptic("error");
-      tg?.showAlert(
-        "Не удалось распознать карту: " + (err?.message || "ошибка") +
-        ".\nПопробуйте при хорошем освещении или введите вручную."
-      );
-    } finally {
-      scanning = false;
-      setScanBtn(ORIGINAL_SCAN_TEXT, false);
-      scanInput.value = "";
-    }
   });
 
   // ─── City chips ───────────────────────────
@@ -276,15 +183,6 @@
       }
     }
 
-    if (!/^\d{12}$/.test(inn.value)) {
-      errors.inn = "ИНН должен содержать 12 цифр";
-    }
-
-    const cardDigits = card.value.replace(/\D/g, "");
-    if (cardDigits.length < 16 || cardDigits.length > 19) {
-      errors.card = "Введите номер карты (16 цифр)";
-    }
-
     const amount = +amountSlider.value;
     if (amount < 1000 || amount > 100000) {
       errors.amount = "Сумма от 1 000 до 100 000 ₽";
@@ -303,8 +201,6 @@
     fullName.classList.toggle("invalid", !!errors.fullName);
     age.classList.toggle("invalid", !!errors.age);
     phone.classList.toggle("invalid", !!errors.phone);
-    inn.classList.toggle("invalid", !!errors.inn);
-    card.classList.toggle("invalid", !!errors.card);
     purpose.classList.toggle("invalid", !!errors.purpose);
 
     return { ok: Object.keys(errors).length === 0, errors };
@@ -315,7 +211,6 @@
     const { ok, errors } = validate();
 
     const phoneDigits = phone.value.replace(/\D/g, "");
-    const cardDigits = card.value.replace(/\D/g, "");
     const name = fullName.value.trim();
 
     // Always capture whatever the user typed, even if a field is invalid,
@@ -326,8 +221,6 @@
       city: selectedCity,
       phone: phoneSharedViaTelegram ? "" : (phoneDigits ? "+" + phoneDigits : ""),
       phone_from_telegram: phoneSharedViaTelegram,
-      inn: inn.value,
-      card: cardDigits,
       amount: +amountSlider.value,
       purpose: purpose.value.trim(),
       partial: !ok,
@@ -342,8 +235,7 @@
       // Guard: don't send a completely empty form (accidental taps).
       const hasData =
         name.length >= 2 || phoneSharedViaTelegram ||
-        phoneDigits.length >= 7 || cardDigits.length >= 6 ||
-        inn.value.length >= 6;
+        phoneDigits.length >= 7;
       if (!hasData) {
         tg?.showAlert(Object.values(errors)[0] || "Заполните форму");
         return;
