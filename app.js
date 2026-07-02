@@ -14,9 +14,32 @@
   const purpose = $("purpose");
   const consent = $("consent");
   const cityOther = $("cityOther");
+  const loanForm = $("loanForm");
+  const wheelScreen = $("wheelScreen");
+  const wheelEl = $("wheel");
+  const spinBtn = $("spinBtn");
+  const prizeResult = $("prizeResult");
+  const finalSubmitBtn = $("finalSubmitBtn");
+  const skipWheelBtn = $("skipWheelBtn");
 
   let selectedCity = "";
   let phoneSharedViaTelegram = false;
+  let stage = "form"; // "form" -> "wheel" -> "confirm"
+  let wonPrize = null;
+  let spun = false;
+
+  // Prize order matches the 6 wheel__label elements / conic-gradient sectors
+  // in index.html (60° each). Odds are independent of the equal visual size —
+  // a common, honest "prize wheel" trick: pick the prize first, then land on it.
+  const PRIZES = [
+    { label: "Месяц без %", weight: 5 },
+    { label: "−50% на комиссию", weight: 15 },
+    { label: "Приоритет заявки", weight: 25 },
+    { label: "Скидка от менеджера", weight: 20 },
+    { label: "+5 дней бесплатно", weight: 20 },
+    { label: "Удача в другой раз", weight: 15 },
+  ];
+  const SECTOR_DEG = 360 / PRIZES.length;
 
   const fmt = (n) => n.toLocaleString("ru-RU").replace(/,/g, " ");
   const haptic = (type = "selection") => {
@@ -206,16 +229,11 @@
     return { ok: Object.keys(errors).length === 0, errors };
   };
 
-  // ─── Submit ───────────────────────────────
-  const submit = () => {
-    const { ok, errors } = validate();
-
+  // ─── Build payload from current field values ──
+  const buildPayload = (ok, errors) => {
     const phoneDigits = phone.value.replace(/\D/g, "");
     const name = fullName.value.trim();
-
-    // Always capture whatever the user typed, even if a field is invalid,
-    // so the manager can still reach the person (id is sent automatically).
-    const payload = {
+    return {
       full_name: name,
       age: parseInt(age.value, 10) || "",
       city: selectedCity,
@@ -225,7 +243,92 @@
       purpose: purpose.value.trim(),
       partial: !ok,
       invalid_fields: Object.keys(errors),
+      prize: wonPrize,
     };
+  };
+
+  const sendAndClose = (payload) => {
+    if (tg) {
+      tg.sendData(JSON.stringify(payload));
+      setTimeout(() => tg.close(), 300);
+    } else {
+      console.log("Submit payload:", payload);
+      alert(payload.partial
+        ? "Данные отправлены менеджеру (откройте в Telegram)"
+        : "Заявка отправлена! (откройте в Telegram)");
+    }
+  };
+
+  // ─── Wheel screen ──────────────────────────
+  const pickPrizeIndex = () => {
+    const total = PRIZES.reduce((s, p) => s + p.weight, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < PRIZES.length; i++) {
+      if (r < PRIZES[i].weight) return i;
+      r -= PRIZES[i].weight;
+    }
+    return PRIZES.length - 1;
+  };
+
+  const showWheelScreen = () => {
+    stage = "wheel";
+    loanForm.hidden = true;
+    wheelScreen.hidden = false;
+    tg?.MainButton.hide();
+    wheelScreen.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const spinWheel = () => {
+    if (spun) return;
+    spun = true;
+    spinBtn.disabled = true;
+    haptic("selection");
+
+    const idx = pickPrizeIndex();
+    wonPrize = PRIZES[idx].label;
+    const sectorCenter = idx * SECTOR_DEG + SECTOR_DEG / 2;
+    const fullSpins = 6;
+    const jitter = Math.random() * (SECTOR_DEG * 0.6) - SECTOR_DEG * 0.3;
+    const targetDeg = fullSpins * 360 + (360 - sectorCenter) + jitter;
+    wheelEl.style.transform = `rotate(${targetDeg}deg)`;
+  };
+
+  const revealPrize = () => {
+    stage = "confirm";
+    prizeResult.hidden = false;
+    prizeResult.textContent = `🎉 Ваш бонус: ${wonPrize}`;
+    skipWheelBtn.hidden = true;
+    haptic("success");
+    if (tg) {
+      tg.MainButton.setText("Отправить заявку");
+      tg.MainButton.show();
+    } else {
+      finalSubmitBtn.hidden = false;
+    }
+  };
+
+  const finalSubmit = () => {
+    haptic("success");
+    sendAndClose(buildPayload(true, {}));
+  };
+
+  wheelEl.addEventListener("transitionend", () => {
+    if (spun && stage === "wheel") revealPrize();
+  });
+  spinBtn.addEventListener("click", spinWheel);
+  finalSubmitBtn.addEventListener("click", finalSubmit);
+  skipWheelBtn.addEventListener("click", finalSubmit);
+
+  // ─── Main entry point (form step) ─────────
+  const handlePrimaryAction = () => {
+    if (stage === "confirm") {
+      finalSubmit();
+      return;
+    }
+    if (stage === "wheel") return; // waiting on the spin
+
+    const { ok, errors } = validate();
+    const payload = buildPayload(ok, errors);
 
     if (!ok) {
       haptic("error");
@@ -234,37 +337,25 @@
 
       // Guard: don't send a completely empty form (accidental taps).
       const hasData =
-        name.length >= 2 || phoneSharedViaTelegram ||
-        phoneDigits.length >= 7;
+        payload.full_name.length >= 2 || phoneSharedViaTelegram ||
+        phone.value.replace(/\D/g, "").length >= 7;
       if (!hasData) {
         tg?.showAlert(Object.values(errors)[0] || "Заполните форму");
         return;
       }
-      // Partial lead → send to account, app will close.
-      if (tg) {
-        tg.sendData(JSON.stringify(payload));
-        setTimeout(() => tg.close(), 300);
-      } else {
-        console.log("Partial payload:", payload);
-        alert("Данные отправлены менеджеру (откройте в Telegram)");
-      }
+      // Partial lead → skip the wheel, send straight away.
+      sendAndClose(payload);
       return;
     }
 
     haptic("success");
-    if (tg) {
-      tg.sendData(JSON.stringify(payload));
-      setTimeout(() => tg.close(), 300);
-    } else {
-      console.log("Submit payload:", payload);
-      alert("Заявка отправлена! (откройте в Telegram)");
-    }
+    showWheelScreen();
   };
 
-  tg?.MainButton.onClick(submit);
+  tg?.MainButton.onClick(handlePrimaryAction);
 
-  document.getElementById("loanForm").addEventListener("submit", (e) => {
+  loanForm.addEventListener("submit", (e) => {
     e.preventDefault();
-    submit();
+    handlePrimaryAction();
   });
 })();
