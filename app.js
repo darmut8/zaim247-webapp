@@ -16,6 +16,7 @@
   const cityOther = $("cityOther");
   const loanForm = $("loanForm");
   const wheelScreen = $("wheelScreen");
+  const wheelWrap = $("wheelWrap");
   const wheelEl = $("wheel");
   const spinBtn = $("spinBtn");
   const prizeResult = $("prizeResult");
@@ -282,6 +283,7 @@
     if (spun) return;
     spun = true;
     spinBtn.disabled = true;
+    wheelWrap.classList.add("is-spinning");
     haptic("selection");
 
     const idx = pickPrizeIndex();
